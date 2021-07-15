@@ -7,43 +7,65 @@ class AutoEncoder(nn.Module):
     def __init__(self):
         super(AutoEncoder, self).__init__()
 
-        self.encoder = self.encoder_layer()
-        # self.flatten = nn.Flatten()
-        # self.fc = self.fully_connected_layer()
-        self.decoder_1 = self.decoder_layer(in_channels=512, out_channels=256)
-        self.decoder_2 = self.decoder_layer(in_channels=256, out_channels=128)
-        self.decoder_3 = self.decoder_layer(in_channels=128, out_channels=3)
+        self.down5 = self.down5_layer(3, 32)
+        self.down4 = self.down4_layer(32, 64)
+        self.down3 = self.down3_layer(64, 128)
+        self.down2 = self.down2_layer(128, 256)
+        self.down1 = self.down1_layer(256, 512)
+        self.fc = self.fully_connected_layer()
+        self.up1 = self.bn_layers(in_channels=512, out_channels=256)
+        self.up2 = self.bn_layers(in_channels=256, out_channels=128)
+        self.up3 = self.bn_layers(in_channels=128, out_channels=64)
+        self.up4 = self.bn_layers(in_channels=64, out_channels=32)
+        self.up5 = self.bn_layers(in_channels=32, out_channels=3)
     
-    def forward(self, x):
-        x = self.encoder(x)
-        # x = self.flatten(x)
-        # x = self.fc(x)
-        # x = x.reshape(1, 512, 64, 64)
-        x = self.decoder_1(x)
-        x = F.interpolate(x, size=(128, 128), mode='bilinear', align_corners=True)
-        x = self.decoder_2(x)
-        x = F.interpolate(x, size=(256, 256), mode='bilinear', align_corners=True)
-        x = self.decoder_3(x)
-        x = F.interpolate(x, size=(512, 512), mode='bilinear', align_corners=True)
+    def forward(self, x_origin):
+        x_down5 = self.down5(x_origin)
+        x_down4 = self.down4(x_down5)
+        x_down3 = self.down3(x_down4)
+        x_down2 = self.down2(x_down3)
+        x_down1 = self.down1(x_down2)
+        x_fc = self.fc(x_down1)
+        x_fc = x_fc.reshape(x_fc.size()[0], 512, 24, 32)
+        x = self.up1(x_fc)
+        x = F.interpolate(x, size=(48, 64), mode='bilinear', align_corners=True)
+        x = self.up2(x) + x_down3
+        x = F.interpolate(x, size=(96, 128), mode='bilinear', align_corners=True)
+        x = self.up3(x) + x_down4
+        x = F.interpolate(x, size=(192, 256), mode='bilinear', align_corners=True)
+        x = self.up4(x) + x_down5
+        x = F.interpolate(x, size=(384, 512), mode='bilinear', align_corners=True)
+        x = self.up5(x) + x_origin
         return x
 
-    def encoder_layer(self):
+    def down5_layer(self, in_channels, out_channels):
         return nn.Sequential(
-            self.batch_layer(in_channels=3, out_channels=128),
-            nn.AvgPool2d(kernel_size=(2, 2), stride=2),
-            self.batch_layer(in_channels=128, out_channels=128),
-            self.batch_layer(in_channels=128, out_channels=128),
-            self.batch_layer(in_channels=128, out_channels=256),
-            nn.AvgPool2d(kernel_size=(2, 2), stride=2),
-            self.batch_layer(in_channels=256, out_channels=256),
-            self.batch_layer(in_channels=256, out_channels=256),
-            self.batch_layer(in_channels=256, out_channels=512),
-            nn.AvgPool2d(kernel_size=(2, 2), stride=2),
-            self.batch_layer(in_channels=512, out_channels=512),
-            self.batch_layer(in_channels=512, out_channels=512),
+            self.batch_layer(in_channels=in_channels, out_channels=out_channels),
+            nn.AdaptiveMaxPool2d(output_size=(192, 256)),
         )
 
-    def decoder_layer(self, in_channels, out_channels):
+    def down4_layer(self, in_channels, out_channels):
+        return nn.Sequential(
+            self.bn_layers(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size=(96, 128)),
+        )
+
+    def down3_layer(self, in_channels, out_channels):
+        return nn.Sequential(
+            self.bn_layers(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size=(48, 64)),
+        )
+
+    def down2_layer(self, in_channels, out_channels):
+        return nn.Sequential(
+            self.bn_layers(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size=(24, 32)),
+        )
+
+    def down1_layer(self, in_channels, out_channels):
+        return self.bn_layers(in_channels, out_channels)
+
+    def bn_layers(self, in_channels, out_channels):
         return nn.Sequential(
             self.batch_layer(in_channels=in_channels, out_channels=in_channels),
             self.batch_layer(in_channels=in_channels, out_channels=in_channels),
@@ -57,10 +79,30 @@ class AutoEncoder(nn.Module):
             nn.SiLU(inplace=True)
         )
 
-    def fully_connected_layer(self, in_features=2097152, out_features=32):
+    def fully_connected_layer(self, in_features=393216, out_features=32):
         return nn.Sequential(
+            nn.Flatten(),
             nn.Linear(in_features, out_features, bias=False),
             nn.SiLU(inplace=True),
             nn.Linear(out_features, in_features, bias=False),
         )
-        
+
+    def init_weights(self):
+        for _, m in self.named_modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.normal_(m.weight, std=0.001)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Sequential):
+                m.apply(self._sequential_init_weights)
+
+    def _sequential_init_weights(self, m):
+            if isinstance(m, nn.Conv2d):
+                nn.init.normal_(m.weight, std=0.001)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, std=0.001)
+            

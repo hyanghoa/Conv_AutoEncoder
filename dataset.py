@@ -1,12 +1,8 @@
 import os
 
 import cv2
-import numpy as np
-
-from torch.nn import functional as F
 from torch.utils import data
 from torchvision import transforms
-from torchvision.transforms.transforms import Normalize, Resize
 
 
 class Dataset(data.Dataset):
@@ -31,7 +27,7 @@ class Dataset(data.Dataset):
     def input_transform(self, image):
         image_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize((512, 512)),
+            transforms.Resize((384, 512)),
             transforms.Normalize(
                 mean=self.mean,
                 std=self.std,
