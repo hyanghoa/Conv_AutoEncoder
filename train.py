@@ -49,7 +49,12 @@ def val(val_loader, model, log):
 
         preds = model(images)
         losses = loss(preds, labels)
-        psnr = 10 * log10(1 / losses.item())
+        
+        try:
+            psnr = 10 * log10(2.64**2 / losses.item())
+        except:
+            log.write("zero division!")
+            psnr = 10
 
         avg_loss.update(losses.item())
         avg_psnr.update(psnr)

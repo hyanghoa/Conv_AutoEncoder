@@ -10,10 +10,10 @@ from train import train, val
 from log import CreateLog
 
 
-TRAIN_FILE_LIST = "./dataset_list/imagenet_train.lst"
-VAL_FILE_LIST = "./dataset_list/imagenet_val.lst"
+TRAIN_FILE_LIST = "./dataset_list/train.lst"
+VAL_FILE_LIST = "./dataset_list/val.lst"
 TOTAL_EPOCH = 300
-BATCH_SIZE = 8
+BATCH_SIZE = 2
 LR = 0.001
 WEIGHT_DECAY = 0.9
 DEVICE_IDS = [0, 1]
