@@ -10,14 +10,15 @@ from train import train, val
 from log import CreateLog
 
 
-TRAIN_FILE_LIST = "./dataset_list/train.lst"
-VAL_FILE_LIST = "./dataset_list/val.lst"
+TRAIN_FILE_LIST = "./dataset_list/imagenet_train.lst"
+VAL_FILE_LIST = "./dataset_list/imagenet_val.lst"
 TOTAL_EPOCH = 300
 BATCH_SIZE = 8
 LR = 0.001
 WEIGHT_DECAY = 0.9
 DEVICE_IDS = [0, 1]
 MODEL_NAME = "test"
+OUTPUT_DIR = f"./outputs/{MODEL_NAME}"
 LOG_DIR = f"./outputs/{MODEL_NAME}/logs"
 RANDOMNESS = False
 
@@ -35,6 +36,7 @@ if RANDOMNESS:
 
 # make dir
 os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(os.path.join(OUTPUT_DIR, "epochs"), exist_ok=True)
 
 # create log
 log = CreateLog(LOG_DIR)
@@ -74,10 +76,24 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,
                                                                  T_mult=1,
                                                                  eta_min=0.0000001)
 
-for current_peoch in range(1, TOTAL_EPOCH):
+best_psnr = 0
+for current_peoch in range(0, TOTAL_EPOCH):
     train(current_peoch, TOTAL_EPOCH, train_loader, optimizer, scheduler, model, log)
-    val(val_loader, model, log)
+    avg_psnr = val(val_loader, model, log)
 
-    torch.save(model.module.state_dict(),
-                os.path.join(OUTPUT_DIR, f"{current_peoch}.pth"))
+    if avg_psnr > best_psnr:
+        best_psnr = avg_psnr
+        torch.save(model.module.state_dict(), os.path.join(OUTPUT_DIR, 'best.pth'))
+        log.write(f"=> saving best checkpoint to {OUTPUT_DIR}/best.pth")
+
+    torch.save({
+        'epoch': current_peoch+1,
+        'best_psnr': best_psnr,
+        'state_dict': model.module.state_dict(),
+        'optimizer': optimizer.state_dict(),
+    }, os.path.join(f"{OUTPUT_DIR}", 'checkpoint.pth.tar'))
+    log.write(f"=> saving checkpoint to {OUTPUT_DIR}/checkpoint.pth.tar")
+
+
+    torch.save(model.module.state_dict(), os.path.join(f"{OUTPUT_DIR}", "epochs", f"{current_peoch}.pth"))
     log.write(f"{current_peoch} epoch model saved!")

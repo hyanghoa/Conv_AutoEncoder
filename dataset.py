@@ -27,10 +27,10 @@ class Dataset(data.Dataset):
     def input_transform(self, image):
         image_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize((384, 512)),
             transforms.Normalize(
                 mean=self.mean,
                 std=self.std,
             ),
+            transforms.Resize((384, 512)),
         ])
         return image_transform(image)

@@ -3,6 +3,63 @@ from torch import nn
 from math import log10
 
 
+def train(current_epoch, total_epoch, train_loader, optimizer, scheduler, model, log):
+    model.train()
+    avg_loss = AverageMeter()
+    avg_psnr = AverageMeter()
+    loss = nn.MSELoss()
+
+    for i_iter, batch in enumerate(train_loader):
+        start_time = time.time()
+        images, labels, _ = batch
+        images = images.cuda()
+        labels = labels.cuda()
+
+        preds = model(images)
+        losses = loss(preds, labels)
+
+        try:
+            psnr = 10 * log10(2.64**2 / losses.item())
+        except:
+            log.write("zero division!")
+            psnr = 10
+
+        avg_loss.update(losses.item())
+        avg_psnr.update(psnr)
+
+        model.zero_grad()
+        losses.backward()
+        optimizer.step()
+        scheduler.step()
+        
+        if i_iter % 10 == 0:
+            log.write(f"epcoh: {current_epoch}/{total_epoch}, lr: {scheduler.get_last_lr()[0]}, iter: {i_iter}/{len(train_loader)}, time: {(time.time()-start_time):.2f}, loss: {avg_loss.average()}, psnr: {avg_psnr.average()}")
+
+def val(val_loader, model, log):
+    model.eval()
+    avg_loss = AverageMeter()
+    avg_psnr = AverageMeter()
+    loss = nn.MSELoss()
+
+    for i_iter, batch in enumerate(val_loader):
+        start_time = time.time()
+        images, labels, _ = batch
+        images = images.cuda()
+        labels = labels.cuda()
+
+        preds = model(images)
+        losses = loss(preds, labels)
+        psnr = 10 * log10(1 / losses.item())
+
+        avg_loss.update(losses.item())
+        avg_psnr.update(psnr)
+
+        if i_iter % 10 == 0:
+            log.write(f"validate, iter: {i_iter}/{len(val_loader)}, time: {time.time()-start_time} , loss: {avg_loss.average()}, psnr: {avg_psnr.average()}")
+
+    return avg_psnr.average()
+
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -37,56 +94,3 @@ class AverageMeter(object):
 
     def average(self):
         return self.avg
-
-
-def train(current_epoch, total_epoch, train_loader, optimizer, scheduler, model, log):
-    model.train()
-    avg_loss = AverageMeter()
-    avg_psnr = AverageMeter()
-    loss = nn.MSELoss()
-
-    for i_iter, batch in enumerate(train_loader):
-        start_time = time.time()
-        images, labels, _ = batch
-        images = images.cuda()
-        labels = labels.cuda()
-
-        preds = model(images)
-        losses = loss(preds, labels)
-        try:
-            psnr = 10 * log10(1 / losses.item())
-        except:
-            psnr = 10 * log10(1 / 1e-5)
-
-        avg_loss.update(losses.item())
-        avg_psnr.update(psnr)
-
-        model.zero_grad()
-        losses.backward()
-        optimizer.step()
-        scheduler.step()
-        
-        if i_iter % 10 == 0:
-            log.write(f"epcoh: {current_epoch}/{total_epoch}, lr: {scheduler.get_last_lr()[0]}, iter: {i_iter}/{len(train_loader)}, time: {(time.time()-start_time):.2f}, loss: {avg_loss.average()}, psnr: {avg_psnr.average()}")
-
-def val(val_loader, model, log):
-    model.eval()
-    avg_loss = AverageMeter()
-    avg_psnr = AverageMeter()
-    loss = nn.MSELoss()
-
-    for i_iter, batch in enumerate(val_loader):
-        start_time = time.time()
-        images, labels, _ = batch
-        images = images.cuda()
-        labels = labels.cuda()
-
-        preds = model(images)
-        losses = loss(preds, labels)
-        psnr = 10 * log10(1 / losses.item())
-
-        avg_loss.update(losses.item())
-        avg_psnr.update(psnr)
-
-        if i_iter % 10 == 0:
-            log.write(f"validate, iter: {i_iter}/{len(val_loader)}, time: {time.time()-start_time} , loss: {avg_loss.average()}, psnr: {avg_psnr.average()}")
