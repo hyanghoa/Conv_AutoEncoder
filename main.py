@@ -1,5 +1,7 @@
 import os
+import random
 
+import numpy as np
 import torch
 
 from model import AutoEncoder
@@ -17,6 +19,19 @@ WEIGHT_DECAY = 0.9
 DEVICE_IDS = [0, 1]
 MODEL_NAME = "test"
 LOG_DIR = f"./outputs/{MODEL_NAME}/logs"
+RANDOMNESS = False
+
+
+# random control
+if RANDOMNESS:
+    random_seed = 12361
+
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(random_seed)
+    random.seed(random_seed)
 
 # make dir
 os.makedirs(LOG_DIR, exist_ok=True)
