@@ -21,7 +21,8 @@ MODEL_NAME = "test"
 OUTPUT_DIR = f"./outputs/{MODEL_NAME}"
 LOG_DIR = f"./outputs/{MODEL_NAME}/logs"
 RANDOMNESS = False
-
+PRETRAINED = True
+PRETRAINED_MODEL = "./outputs/test/1.pth"
 
 # random control
 if RANDOMNESS:
@@ -44,11 +45,17 @@ log = CreateLog(LOG_DIR)
 # create model
 model = AutoEncoder()
 
+# load pretrained model
+if PRETRAINED:
+    model.load_state_dict(torch.load(PRETRAINED_MODEL))
+
+else:
+    model.init_weights()
+
+model = torch.nn.DataParallel(model, device_ids=DEVICE_IDS)
+
 if torch.cuda.is_available():
     model.cuda()
-
-model.init_weights()
-model = torch.nn.DataParallel(model, device_ids=DEVICE_IDS)
 
 # dataset
 train_dataset = Dataset(file_list=TRAIN_FILE_LIST)
