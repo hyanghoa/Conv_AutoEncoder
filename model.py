@@ -1,5 +1,5 @@
+import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class AutoEncoder(nn.Module):
@@ -7,17 +7,17 @@ class AutoEncoder(nn.Module):
     def __init__(self):
         super(AutoEncoder, self).__init__()
 
-        self.down5 = self.down5_layer(3, 32)
-        self.down4 = self.down4_layer(32, 64)
-        self.down3 = self.down3_layer(64, 128)
-        self.down2 = self.down2_layer(128, 256)
-        self.down1 = self.down1_layer(256, 512)
+        self.down5 = self.down5_layer(3, 32, (192, 256))
+        self.down4 = self.down4_layer(32, 64, (96, 128))
+        self.down3 = self.down3_layer(64, 128, (48, 64))
+        self.down2 = self.down2_layer(128, 256, (24, 32))
+        self.down1 = self.down1_layer(256, 512, (12, 16))
         self.fc = self.fully_connected_layer()
-        self.up1 = self.bn_layers(in_channels=512, out_channels=256)
-        self.up2 = self.bn_layers(in_channels=256, out_channels=128)
-        self.up3 = self.bn_layers(in_channels=128, out_channels=64)
-        self.up4 = self.bn_layers(in_channels=64, out_channels=32)
-        self.up5 = self.bn_layers(in_channels=32, out_channels=3)
+        self.up1 = self.upsampling(512, 256)
+        self.up2 = self.upsampling(256, 128)
+        self.up3 = self.upsampling(128, 64)
+        self.up4 = self.upsampling(64, 32)
+        self.up5 = self.upsampling(32, 3)
     
     def forward(self, x_origin):
         x_down5 = self.down5(x_origin)
@@ -25,47 +25,58 @@ class AutoEncoder(nn.Module):
         x_down3 = self.down3(x_down4)
         x_down2 = self.down2(x_down3)
         x_down1 = self.down1(x_down2)
-        x_fc = self.fc(x_down1)
-        x_fc = x_fc.reshape(x_fc.size()[0], 512, 24, 32)
-        x = self.up1(x_fc)
-        x = F.interpolate(x, size=(48, 64), mode='bilinear', align_corners=True)
+        x = self.fc(x_down1)
+        x = self.up1(x) + x_down2
         x = self.up2(x) + x_down3
-        x = F.interpolate(x, size=(96, 128), mode='bilinear', align_corners=True)
         x = self.up3(x) + x_down4
-        x = F.interpolate(x, size=(192, 256), mode='bilinear', align_corners=True)
         x = self.up4(x) + x_down5
-        x = F.interpolate(x, size=(384, 512), mode='bilinear', align_corners=True)
         x = self.up5(x) + x_origin
         return x
 
-    def down5_layer(self, in_channels, out_channels):
+    def down5_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
-            self.batch_layer(in_channels=in_channels, out_channels=out_channels),
-            nn.AdaptiveMaxPool2d(output_size=(192, 256)),
+            self.batch_layer(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size),
         )
 
-    def down4_layer(self, in_channels, out_channels):
+    def down4_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
-            self.bn_layers(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size=(96, 128)),
+            self.batch_layers(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size),
         )
 
-    def down3_layer(self, in_channels, out_channels):
+    def down3_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
-            self.bn_layers(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size=(48, 64)),
+            self.batch_layers(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size),
         )
 
-    def down2_layer(self, in_channels, out_channels):
+    def down2_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
-            self.bn_layers(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size=(24, 32)),
+            self.batch_layers(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size),
         )
 
-    def down1_layer(self, in_channels, out_channels):
-        return self.bn_layers(in_channels, out_channels)
+    def down1_layer(self, in_channels, out_channels, output_size):
+        return nn.Sequential(
+            self.batch_layers(in_channels, out_channels),
+            nn.AdaptiveMaxPool2d(output_size),
+        )
 
-    def bn_layers(self, in_channels, out_channels):
+    def upsampling(self, in_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1):
+        return nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.SiLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding, bias=False),
+            nn.BatchNorm2d(num_features=out_channels),
+            nn.SiLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding, bias=False),
+            nn.BatchNorm2d(num_features=out_channels),
+            nn.SiLU(inplace=True)
+        )
+
+    def batch_layers(self, in_channels, out_channels):
         return nn.Sequential(
             self.batch_layer(in_channels=in_channels, out_channels=in_channels),
             self.batch_layer(in_channels=in_channels, out_channels=in_channels),
@@ -79,12 +90,14 @@ class AutoEncoder(nn.Module):
             nn.SiLU(inplace=True)
         )
 
-    def fully_connected_layer(self, in_features=393216, out_features=32):
+    def fully_connected_layer(self, in_features=98304, out_features=256):
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features, out_features, bias=False),
-            nn.SiLU(inplace=True),
-            nn.Linear(out_features, in_features, bias=False),
+            nn.Linear(in_features, out_features, bias=True),
+            nn.Linear(256, 128, bias=True),
+            nn.Linear(128, 256, bias=True),
+            nn.Linear(256, in_features, bias=True),
+            nn.Unflatten(1, torch.Size([512, 12, 16])),
         )
 
     def init_weights(self):
@@ -105,4 +118,3 @@ class AutoEncoder(nn.Module):
                 nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, std=0.001)
-            

@@ -4,25 +4,25 @@ import random
 import numpy as np
 import torch
 
-from model import AutoEncoder
+from model2 import AutoEncoder
 from dataset import Dataset
 from train import train, val
 from log import CreateLog
 
 
-TRAIN_FILE_LIST = "./dataset_list/train.lst"
-VAL_FILE_LIST = "./dataset_list/val.lst"
+TRAIN_FILE_LIST = "./dataset_list/imagenet_train.lst"
+VAL_FILE_LIST = "./dataset_list/imagenet_val.lst"
 TOTAL_EPOCH = 300
-BATCH_SIZE = 2
-LR = 0.001
-WEIGHT_DECAY = 0.9
+BATCH_SIZE = 20
+LR = 0.01
+WEIGHT_DECAY = 0.0005
 DEVICE_IDS = [0, 1]
-MODEL_NAME = "test"
+MODEL_NAME = "autoencoder_test"
 OUTPUT_DIR = f"./outputs/{MODEL_NAME}"
 LOG_DIR = f"./outputs/{MODEL_NAME}/logs"
 RANDOMNESS = False
-PRETRAINED = True
-PRETRAINED_MODEL = "./outputs/test/1.pth"
+PRETRAINED = False
+PRETRAINED_MODEL = "./outputs/test/2.pth"
 
 # random control
 if RANDOMNESS:
@@ -77,16 +77,17 @@ val_loader = torch.utils.data.DataLoader(
         drop_last=True)
 
 # optimizer
+loss = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,
                                                                  T_0=10, 
                                                                  T_mult=1,
-                                                                 eta_min=0.0000001)
+                                                                 eta_min=0.00001)
 
 best_psnr = 0
 for current_peoch in range(0, TOTAL_EPOCH):
-    train(current_peoch, TOTAL_EPOCH, train_loader, optimizer, scheduler, model, log)
-    avg_psnr = val(val_loader, model, log)
+    train(current_peoch, TOTAL_EPOCH, train_loader, optimizer, scheduler, model, loss, log)
+    avg_psnr = val(val_loader, model, loss, log)
 
     if avg_psnr > best_psnr:
         best_psnr = avg_psnr

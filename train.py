@@ -3,7 +3,7 @@ from torch import nn
 from math import log10
 
 
-def train(current_epoch, total_epoch, train_loader, optimizer, scheduler, model, log):
+def train(current_epoch, total_epoch, train_loader, optimizer, scheduler, model, loss, log):
     model.train()
     avg_loss = AverageMeter()
     avg_psnr = AverageMeter()
@@ -22,6 +22,8 @@ def train(current_epoch, total_epoch, train_loader, optimizer, scheduler, model,
             psnr = 10 * log10(2.64**2 / losses.item())
         except:
             log.write("zero division!")
+            log.write(losses.item())
+            log.write(losses)
             psnr = 10
 
         avg_loss.update(losses.item())
@@ -33,9 +35,9 @@ def train(current_epoch, total_epoch, train_loader, optimizer, scheduler, model,
         scheduler.step()
         
         if i_iter % 10 == 0:
-            log.write(f"epcoh: {current_epoch}/{total_epoch}, lr: {scheduler.get_last_lr()[0]}, iter: {i_iter}/{len(train_loader)}, time: {(time.time()-start_time):.2f}, loss: {avg_loss.average()}, psnr: {avg_psnr.average()}")
+            log.write(f"epcoh: {current_epoch}/{total_epoch}, iter: {i_iter}/{len(train_loader)}, time: {(time.time()-start_time):.2f}, lr: {scheduler.get_last_lr()[0]}, loss: {avg_loss.average()}, psnr: {avg_psnr.average()}")
 
-def val(val_loader, model, log):
+def val(val_loader, model, loss, log):
     model.eval()
     avg_loss = AverageMeter()
     avg_psnr = AverageMeter()
