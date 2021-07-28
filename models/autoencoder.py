@@ -18,7 +18,7 @@ class AutoEncoder(nn.Module):
         self.up3 = self.upsampling(128, 64)
         self.up4 = self.upsampling(64, 32)
         self.up5 = self.upsampling(32, 3)
-    
+
     def forward(self, x_origin):
         x_down5 = self.down5(x_origin)
         x_down4 = self.down4(x_down5)
@@ -36,56 +36,67 @@ class AutoEncoder(nn.Module):
     def down5_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
             self.batch_layer(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size),
+            nn.AdaptiveAvgPool2d(output_size),
         )
 
     def down4_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
             self.batch_layers(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size),
+            nn.AdaptiveAvgPool2d(output_size),
         )
 
     def down3_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
             self.batch_layers(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size),
+            nn.AdaptiveAvgPool2d(output_size),
         )
 
     def down2_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
             self.batch_layers(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size),
+            nn.AdaptiveAvgPool2d(output_size),
         )
 
     def down1_layer(self, in_channels, out_channels, output_size):
         return nn.Sequential(
             self.batch_layers(in_channels, out_channels),
-            nn.AdaptiveMaxPool2d(output_size),
+            nn.AdaptiveAvgPool2d(output_size),
         )
 
-    def upsampling(self, in_channels, out_channels, kernel_size=3, stride=2, padding=1, output_padding=1):
+    def upsampling(self, in_channels, out_channels, kernel_size=3,
+                   stride=2, padding=1, output_padding=1):
         return nn.Sequential(
-            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, bias=False),
+            nn.ConvTranspose2d(in_channels, out_channels,
+                               kernel_size=kernel_size, stride=stride,
+                               padding=padding, output_padding=output_padding,
+                               bias=False),
             nn.BatchNorm2d(out_channels),
             nn.SiLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding, bias=False),
+            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1,
+                      padding=padding, bias=False),
             nn.BatchNorm2d(num_features=out_channels),
             nn.SiLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding, bias=False),
+            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1,
+                      padding=padding, bias=False),
             nn.BatchNorm2d(num_features=out_channels),
             nn.SiLU(inplace=True)
         )
 
     def batch_layers(self, in_channels, out_channels):
         return nn.Sequential(
-            self.batch_layer(in_channels=in_channels, out_channels=in_channels),
-            self.batch_layer(in_channels=in_channels, out_channels=in_channels),
-            self.batch_layer(in_channels=in_channels, out_channels=out_channels),
+            self.batch_layer(in_channels=in_channels,
+                             out_channels=in_channels),
+            self.batch_layer(in_channels=in_channels,
+                             out_channels=in_channels),
+            self.batch_layer(in_channels=in_channels,
+                             out_channels=out_channels),
         )
 
-    def batch_layer(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False):
+    def batch_layer(self, in_channels, out_channels, kernel_size=3, stride=1,
+                    padding=1, bias=False):
         return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
+                      padding=padding, bias=bias),
             nn.BatchNorm2d(num_features=out_channels),
             nn.SiLU(inplace=True)
         )
@@ -111,10 +122,10 @@ class AutoEncoder(nn.Module):
                 m.apply(self._sequential_init_weights)
 
     def _sequential_init_weights(self, m):
-            if isinstance(m, nn.Conv2d):
-                nn.init.normal_(m.weight, std=0.001)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, std=0.001)
+        if isinstance(m, nn.Conv2d):
+            nn.init.normal_(m.weight, std=0.001)
+        elif isinstance(m, nn.BatchNorm2d):
+            nn.init.constant_(m.weight, 1)
+            nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.Linear):
+            nn.init.normal_(m.weight, std=0.001)
